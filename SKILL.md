@@ -141,11 +141,12 @@ Add local DNS records under `server:`:
 - `local-zone ... nodefault` prevents Unbound from treating the zone as a
   static fallback; allows forwarding to an upstream resolver for names not
   defined in `local-data`
-- Trailing dots on names are mandatory: `host.example.net.` (with dot)
+- Trailing dots on names (`host.example.net.`) are recommended for clarity but
+  not required — Unbound treats `local-data` names as absolute either way
 
 ### Short Names Don't Resolve at Unbound
 
-`local-data` entries must use FQDNs (`pve.example.net.`, not `pve`). Unbound
+`local-data` entries must use FQDNs (`pve.example.net`, not `pve`). Unbound
 will not append search domains to bare hostnames — that's a client-side
 function. Tools like `dig` send the literal query, so `dig @unbound pve`
 returns nothing.
