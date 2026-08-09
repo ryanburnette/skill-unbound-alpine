@@ -167,6 +167,46 @@ or tools that don't use search domains), add separate `local-data` entries:
 This duplicates records, so the default approach is to rely on client-side
 search domains and only add bare records if a device requires it.
 
+### Add or change a local record
+
+Always edit the live config on the host. Keep `local-data` lines sorted by IP
+so the next edit is easy to place.
+
+```sh
+# 1. Backup before editing
+cp /etc/unbound/unbound.conf \
+  /etc/unbound/unbound.conf.pre-<reason>-$(date +%Y%m%d)
+
+# 2. Edit /etc/unbound/unbound.conf — add/change the local-data line under server:
+#    local-data: "host.example.net. IN A 192.168.x.y"
+
+# 3. Validate, then reload (prefer reload over restart for record-only changes)
+unbound-checkconf /etc/unbound/unbound.conf
+rc-service unbound reload
+# equivalent: unbound-control reload
+
+# 4. Verify from the unbound host
+nslookup host.example.net 127.0.0.1
+```
+
+`dig` is often not installed on Alpine. Prefer `nslookup` (bind-tools is not
+a default dep) or `unbound-host -C /etc/unbound/unbound.conf host.example.net`.
+
+Do not leave a bad config loaded. If `unbound-checkconf` fails, fix or restore
+the backup before reloading.
+
+## Remote shell gotchas
+
+The `app` user on Alpine boxes often has **fish** as the login shell (webi
+default). SSH one-liners that assume bash will fail:
+
+- `set -e` is a bash/POSIX-sh builtin; fish errors on it
+- `cmd1 || cmd2` and complex pipelines behave differently under fish
+- Prefer `ssh host 'bash -lc '\''...'\'''` when you need POSIX/bash, or run
+  one simple command per SSH invocation
+
+Root via `sudo` is fine for conf edits; unbound itself runs as user `unbound`.
+
 ## Stub Zones (Forward to Upstream DNS)
 
 Forward a zone to another resolver (e.g., a UniFi gateway):
