@@ -197,13 +197,20 @@ the backup before reloading.
 
 ## Remote shell gotchas
 
-The `app` user on Alpine boxes often has **fish** as the login shell (webi
-default). SSH one-liners that assume bash will fail:
+The Alpine `app` account uses `ash`. `bash` may not be installed, and
+`ssh host 'bash -lc ...'` then fails with `bash: not found`. Run a POSIX
+script through `sh`, which both `ash` and fish can execute:
 
-- `set -e` is a bash/POSIX-sh builtin; fish errors on it
-- `cmd1 || cmd2` and complex pipelines behave differently under fish
-- Prefer `ssh host 'bash -lc '\''...'\'''` when you need POSIX/bash, or run
-  one simple command per SSH invocation
+```sh
+ssh host 'sh -s' <<'EOF'
+set -eu
+# commands
+EOF
+```
+
+webi sets the login shell to fish. Under fish, `set -e` is an error and
+`cmd1 || cmd2` does not work like POSIX sh. One simple command per SSH
+invocation also works.
 
 Root via `sudo` is fine for conf edits; unbound itself runs as user `unbound`.
 
@@ -226,7 +233,28 @@ and expected for internal resolvers.
 
 ## Logrotate
 
-Alpine's unbound package installs `/etc/logrotate.d/unbound`:
+The unbound package does not install a logrotate snippet. On Alpine 3.23
+with unbound 1.24.2-r0, `/etc/logrotate.d/unbound` was absent, and
+`apk add logrotate` did not create one. `cloud-init-logrotate` is a
+separate `install_if` package; unbound has no equivalent. Write the file
+yourself.
+
+`apk add logrotate` adds `/etc/periodic/daily/logrotate` and
+`/etc/logrotate.conf`. The global config sets `weekly`, `rotate 4`, and
+`compress`. Directives in the unbound file override those. Set `nocompress`
+in the file when the recent logs should stay readable.
+
+The daily script runs only if `crond` is up. Alpine can have
+`/etc/init.d/crond` and `/etc/crontabs/root` on disk while `crond` is left
+out of the default runlevel, in which case `/etc/periodic/daily` never
+runs. The root crontab runs that directory at 02:00.
+
+```sh
+rc-update add crond default
+rc-service crond start
+```
+
+Example, seven rotated files, older ones compressed:
 
 ```
 /var/log/unbound.log {
